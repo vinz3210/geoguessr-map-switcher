@@ -1,0 +1,199 @@
+// ==UserScript==
+// @name         Geoguessr Map Switcher
+// @namespace    http://tampermonkey.net/
+// @version      0.3
+// @description  Switch to OpenStreetMap, OpenTopoMap, etc. in Geoguessr
+// @author       ChatGuessr
+// @match        https://www.geoguessr.com/*
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=geoguessr.com
+// @grant        none
+// @run-at       document-start
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    const DEBUG_OUTPUT = false;
+
+    function log(...args) {
+        if (DEBUG_OUTPUT) {
+            console.log(...args);
+        }
+    }
+
+    log('[Geoguessr Map Switcher] Script started');
+
+    function getLocalStorage(key, defaultValue) {
+        try {
+            const value = localStorage.getItem(key);
+            return value ? JSON.parse(value) : defaultValue;
+        } catch (e) {
+            return defaultValue;
+        }
+    }
+
+    function setLocalStorage(key, value) {
+        try {
+            localStorage.setItem(key, JSON.stringify(value));
+        } catch (e) {
+            console.error('[Geoguessr Map Switcher] Failed to save to localStorage', e);
+        }
+    }
+
+    // Interception logic adapted from unity.user.js
+    function overrideOnLoad(googleScript, observer, overrider) {
+        log('[Geoguessr Map Switcher] Overriding onload for script:', googleScript.src);
+        const oldOnload = googleScript.onload;
+        googleScript.onload = (event) => {
+            log('[Geoguessr Map Switcher] Google Maps script loaded');
+            const google = window.google;
+            if (google) {
+                log('[Geoguessr Map Switcher] google object found, disconnecting observer');
+                observer.disconnect();
+                overrider(google);
+            } else {
+                console.error('[Geoguessr Map Switcher] google object NOT found after load');
+            }
+            if (oldOnload) {
+                oldOnload.call(googleScript, event);
+            }
+        };
+    }
+
+    function grabGoogleScript(mutations) {
+        for (const mutation of mutations) {
+            for (const newNode of mutation.addedNodes) {
+                const asScript = newNode;
+                if (asScript && asScript.src && asScript.src.startsWith('https://maps.googleapis.com/')) {
+                    log('[Geoguessr Map Switcher] Found Google Maps script:', asScript.src);
+                    return asScript;
+                }
+            }
+        }
+        return null;
+    }
+
+    function injecter(overrider) {
+        log('[Geoguessr Map Switcher] Starting MutationObserver');
+        new MutationObserver((mutations, observer) => {
+            const googleScript = grabGoogleScript(mutations);
+            if (googleScript) {
+                overrideOnLoad(googleScript, observer, overrider);
+            }
+        }).observe(document.documentElement, { childList: true, subtree: true });
+    }
+
+    function initMapSwitcher(google) {
+        log('[Geoguessr Map Switcher] Initializing Map Switcher');
+        const originalMap = google.maps.Map;
+
+        google.maps.Map = class extends originalMap {
+            constructor(mapDiv, opts) {
+                log('[Geoguessr Map Switcher] Map constructor called');
+                super(mapDiv, opts);
+                this._mapDiv = mapDiv;
+
+                // Define custom map types
+                const openTopoMapType = new google.maps.ImageMapType({
+                    getTileUrl: function (coord, zoom) {
+                        return 'https://c.tile.opentopomap.org/' + zoom + '/' + coord.x + '/' + coord.y + '.png';
+                    },
+                    tileSize: new google.maps.Size(256, 256),
+                    name: 'OTM',
+                    maxZoom: 18
+                });
+                this.mapTypes.set('opentopomap', openTopoMapType);
+                log('[Geoguessr Map Switcher] Added OpenTopoMap');
+
+                const osmMapType = new google.maps.ImageMapType({
+                    getTileUrl: function (coord, zoom) {
+                        return 'https://tile.openstreetmap.org/' + zoom + '/' + coord.x + '/' + coord.y + '.png';
+                    },
+                    tileSize: new google.maps.Size(256, 256),
+                    name: 'OSM',
+                    maxZoom: 18
+                });
+                this.mapTypes.set('osm', osmMapType);
+                log('[Geoguessr Map Switcher] Added OpenStreetMap');
+
+                // Restore last used map type
+                const savedMapTypeId = getLocalStorage('cg_MapTypeId');
+                if (savedMapTypeId) {
+                    log('[Geoguessr Map Switcher] Restoring map type:', savedMapTypeId);
+                    this.setMapTypeId(savedMapTypeId);
+                }
+
+                this.addListener('maptypeid_changed', () => {
+                    const currentType = this.getMapTypeId();
+                    log('[Geoguessr Map Switcher] Map type changed to:', currentType);
+                    setLocalStorage('cg_MapTypeId', currentType);
+                });
+
+                // Periodic check to enforce map controls
+                setInterval(() => {
+                    const currentOptions = this.get('mapTypeControlOptions');
+                    const desiredMapTypeIds = [
+                        google.maps.MapTypeId.ROADMAP,
+                        google.maps.MapTypeId.TERRAIN,
+                        google.maps.MapTypeId.SATELLITE,
+                        google.maps.MapTypeId.HYBRID,
+                        'osm',
+                        'opentopomap'
+                    ];
+
+                    // Check if we need to re-apply options
+                    if (!this.get('mapTypeControl') ||
+                        !currentOptions ||
+                        JSON.stringify(currentOptions.mapTypeIds) !== JSON.stringify(desiredMapTypeIds) ||
+                        currentOptions.position !== google.maps.ControlPosition.TOP_RIGHT) {
+
+                        log('[Geoguessr Map Switcher] Re-applying map options (setInterval)');
+                        this.setOptions({
+                            mapTypeControl: true,
+                            mapTypeControlOptions: {
+                                mapTypeIds: desiredMapTypeIds,
+                                style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+                                position: google.maps.ControlPosition.TOP_RIGHT
+                            }
+                        });
+                    }
+                }, 1000);
+            }
+
+            setOptions(opts) {
+                log('[Geoguessr Map Switcher] setOptions called with:', opts);
+                // Intercept setOptions to ensure our controls are always present
+                if (opts.backgroundColor || opts.disableDefaultUI) { // Geoguessr often sets these
+                    log('[Geoguessr Map Switcher] Enforcing mapTypeControl in setOptions');
+                    opts.mapTypeControl = true;
+                    opts.mapTypeControlOptions = {
+                        mapTypeIds: [
+                            google.maps.MapTypeId.ROADMAP,
+                            google.maps.MapTypeId.TERRAIN,
+                            google.maps.MapTypeId.SATELLITE,
+                            google.maps.MapTypeId.HYBRID,
+                            'osm',
+                            'opentopomap'
+                        ],
+                        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+                        position: google.maps.ControlPosition.TOP_RIGHT
+                    };
+                }
+                super.setOptions(opts);
+            }
+        };
+    }
+
+    // Inject CSS to ensure map controls are visible
+    const style = document.createElement('style');
+    style.textContent = `
+        .gm-style-mtc {
+            display: block !important;
+            z-index: 999999 !important;
+        }
+    `;
+    document.head.appendChild(style);
+
+    injecter(initMapSwitcher);
+
+})();
