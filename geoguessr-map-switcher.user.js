@@ -14,6 +14,7 @@
     'use strict';
 
     const DEBUG_OUTPUT = false;
+    const ENABLE_EXTENDED_MODES = false;
 
     function log(...args) {
         if (DEBUG_OUTPUT) {
@@ -38,6 +39,23 @@
         } catch (e) {
             console.error('[Geoguessr Map Switcher] Failed to save to localStorage', e);
         }
+    }
+
+    function isGamePage() {
+        // Handle localization (e.g., /fr/game/...) by stripping the language prefix
+        const path = location.pathname.replace(/^\/[a-z]{2}\//i, "/");
+
+        if (ENABLE_EXTENDED_MODES) {
+            return path.startsWith("/challenge/") ||
+                path.startsWith("/results/") ||
+                path.startsWith("/game/") ||
+                path.startsWith("/battle-royale/") ||
+                path.startsWith("/duels/") ||
+                path.startsWith("/team-duels/") ||
+                path.startsWith("/bullseye/") ||
+                path.startsWith("/live-challenge/");
+        }
+        return path.startsWith("/game/") || path.startsWith("/results/");
     }
 
     // Interception logic adapted from unity.user.js
@@ -91,6 +109,12 @@
             constructor(mapDiv, opts) {
                 log('[Geoguessr Map Switcher] Map constructor called');
                 super(mapDiv, opts);
+
+                if (!isGamePage()) {
+                    log('[Geoguessr Map Switcher] Not a game page, skipping customization');
+                    return;
+                }
+
                 this._mapDiv = mapDiv;
 
                 // Define custom map types
@@ -131,6 +155,8 @@
 
                 // Periodic check to enforce map controls
                 setInterval(() => {
+                    if (!isGamePage()) return;
+
                     const currentOptions = this.get('mapTypeControlOptions');
                     const desiredMapTypeIds = [
                         google.maps.MapTypeId.ROADMAP,
@@ -162,22 +188,25 @@
 
             setOptions(opts) {
                 log('[Geoguessr Map Switcher] setOptions called with:', opts);
-                // Intercept setOptions to ensure our controls are always present
-                if (opts.backgroundColor || opts.disableDefaultUI) { // Geoguessr often sets these
-                    log('[Geoguessr Map Switcher] Enforcing mapTypeControl in setOptions');
-                    opts.mapTypeControl = true;
-                    opts.mapTypeControlOptions = {
-                        mapTypeIds: [
-                            google.maps.MapTypeId.ROADMAP,
-                            google.maps.MapTypeId.TERRAIN,
-                            google.maps.MapTypeId.SATELLITE,
-                            google.maps.MapTypeId.HYBRID,
-                            'osm',
-                            'opentopomap'
-                        ],
-                        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-                        position: google.maps.ControlPosition.TOP_RIGHT
-                    };
+
+                if (isGamePage()) {
+                    // Intercept setOptions to ensure our controls are always present
+                    if (opts.backgroundColor || opts.disableDefaultUI) { // Geoguessr often sets these
+                        log('[Geoguessr Map Switcher] Enforcing mapTypeControl in setOptions');
+                        opts.mapTypeControl = true;
+                        opts.mapTypeControlOptions = {
+                            mapTypeIds: [
+                                google.maps.MapTypeId.ROADMAP,
+                                google.maps.MapTypeId.TERRAIN,
+                                google.maps.MapTypeId.SATELLITE,
+                                google.maps.MapTypeId.HYBRID,
+                                'osm',
+                                'opentopomap'
+                            ],
+                            style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+                            position: google.maps.ControlPosition.TOP_RIGHT
+                        };
+                    }
                 }
                 super.setOptions(opts);
             }
