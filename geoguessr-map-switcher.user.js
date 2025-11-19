@@ -1,13 +1,14 @@
 // ==UserScript==
 // @name         Geoguessr Map Switcher
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.4
 // @description  Switch to OpenStreetMap, OpenTopoMap, etc. in Geoguessr
-// @author       ChatGuessr
+// @author       vinz3210
 // @match        https://www.geoguessr.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=geoguessr.com
 // @grant        none
 // @run-at       document-start
+// @license      MIT
 // ==/UserScript==
 
 (function () {
