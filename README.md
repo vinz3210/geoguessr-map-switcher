@@ -10,6 +10,7 @@ A powerful userscript that enhances your Geoguessr experience by allowing you to
   - ⛰️ OpenTopoMap (OTM)
 - **Persistent Settings**: Your selected map type is saved and automatically restored in your next game.
 - **Seamless Integration**: Adds standard map controls to the Geoguessr interface.
+- **Cleaner Interface**: Automatically removes the "Game Reactions" UI element.
 
 ## 🚀 Installation
 
@@ -27,6 +28,21 @@ A powerful userscript that enhances your Geoguessr experience by allowing you to
 2. Look for the map type control buttons in the **top-right corner** of the map view.
 3. Click to switch between map views (Map, Satellite, OSM, OTM).
 4. The script will remember your choice for future games!
+
+### ⌨️ Keyboard Shortcuts
+
+Quickly switch map styles using the number keys (top row or numpad):
+
+| Key | Map Style |
+| :--- | :--- |
+| `1` | 🗺️ Google Roadmap |
+| `2` | ⛰️ Google Terrain |
+| `3` | 🛰️ Google Satellite |
+| `4` | 🏷️ Google Hybrid |
+| `5` | 🏙️ OpenStreetMap |
+| `6` | 🌲 OpenTopoMap |
+
+*Note: Shortcuts are disabled while typing in chat or guess inputs.*
 
 ## 🔧 Compatibility
 

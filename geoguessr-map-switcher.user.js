@@ -102,6 +102,34 @@
         }).observe(document.documentElement, { childList: true, subtree: true });
     }
 
+    function initReactionRemover() {
+        log('[Geoguessr Map Switcher] Initializing Reaction Remover');
+
+        const remove = () => {
+            const reactions = document.querySelector('[class^="game-reactions_root"]');
+            if (reactions) {
+                reactions.remove();
+                log('[Geoguessr Map Switcher] Removed game-reactions_root');
+            }
+        };
+
+        // Observer to handle dynamic loading
+        const observer = new MutationObserver(() => {
+            remove();
+        });
+
+        // Start observing when body is available
+        if (document.body) {
+            observer.observe(document.body, { childList: true, subtree: true });
+            remove();
+        } else {
+            document.addEventListener('DOMContentLoaded', () => {
+                observer.observe(document.body, { childList: true, subtree: true });
+                remove();
+            });
+        }
+    }
+
     function initMapSwitcher(google) {
         log('[Geoguessr Map Switcher] Initializing Map Switcher');
         const originalMap = google.maps.Map;
@@ -152,6 +180,35 @@
                     const currentType = this.getMapTypeId();
                     log('[Geoguessr Map Switcher] Map type changed to:', currentType);
                     setLocalStorage('cg_MapTypeId', currentType);
+                });
+
+                // Keyboard shortcuts for map styles
+                document.addEventListener('keydown', (e) => {
+                    // Don't trigger if user is typing in an input
+                    if (document.activeElement &&
+                        (document.activeElement.tagName === 'INPUT' ||
+                            document.activeElement.tagName === 'TEXTAREA' ||
+                            document.activeElement.isContentEditable)) {
+                        return;
+                    }
+
+                    // 1-6 keys (both top row and numpad)
+                    // Top row: 49-54, Numpad: 97-102
+                    // Using e.key is cleaner
+
+                    if (e.key === '1') {
+                        this.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+                    } else if (e.key === '2') {
+                        this.setMapTypeId(google.maps.MapTypeId.TERRAIN);
+                    } else if (e.key === '3') {
+                        this.setMapTypeId(google.maps.MapTypeId.SATELLITE);
+                    } else if (e.key === '4') {
+                        this.setMapTypeId(google.maps.MapTypeId.HYBRID);
+                    } else if (e.key === '5') {
+                        this.setMapTypeId('osm');
+                    } else if (e.key === '6') {
+                        this.setMapTypeId('opentopomap');
+                    }
                 });
 
                 // Periodic check to enforce map controls
@@ -225,5 +282,6 @@
     document.head.appendChild(style);
 
     injecter(initMapSwitcher);
+    initReactionRemover();
 
 })();
