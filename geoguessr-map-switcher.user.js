@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Geoguessr Map Switcher
 // @namespace    http://tampermonkey.net/
-// @version      0.4
+// @version      0.5
 // @description  Switch to OpenStreetMap, OpenTopoMap, etc. in Geoguessr
 // @author       vinz3210
 // @match        https://www.geoguessr.com/*
